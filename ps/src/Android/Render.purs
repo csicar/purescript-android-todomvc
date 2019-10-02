@@ -2,12 +2,12 @@ module Android.Render where
 
 import Prelude
 
-import Android.Attributes (Layout, TextStyle, editType, onTextChange, orientation, singleLine, textSize)
+import Android.Attributes (Layout, TextStyle, editType, onTextChange, orientation, singleLine, textSize, width)
 import Android.Internal.View (class IsSetText, class IsTextView, class IsView, Context, View, addView, button, checkbox, editText, emptyView, getView, linearLayout, removeView, replaceView, setChecked, setEditType, setHeight, setOrientation, setSingleLine, setText, setTextSize, setTextStyle, setWidth, textView, toView, toViewGroup)
 import Android.Internal.View as I
 import Android.Ui (Ui(..))
 import Control.Monad.ST as ST
-import Data.Array (drop, dropEnd, fold, length, range, reverse)
+import Data.Array (drop, dropEnd, fold, head, length, range, reverse)
 import Data.Array (zipWith, zip)
 import Data.Foldable (for_, sequence_)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -37,7 +37,7 @@ runUi :: ∀s e.  Context -> SimpleApp s e -> Effect Unit
 runUi ctx app = do
   topLayout <- I.linearLayout ctx
   setContentView (toView topLayout) ctx
-  runUi' ctx  app (toViewGroup topLayout) Empty
+  runUi' ctx app (toViewGroup topLayout) Empty
 
 runUi' :: ∀s e. Context -> SimpleApp s e -> I.ViewGroup -> Ui e -> Effect Unit
 runUi' ctx {view, initial, update} topLayout oldUi = do
@@ -48,10 +48,10 @@ runUi' ctx {view, initial, update} topLayout oldUi = do
     ctx
     -- TODO: this probably a memory leak, as it clojures over oldUi
     (\ev -> do
-      let newState = update initial ev
-      runUi' ctx {view, initial : newState, update} topLayout newView) 
+      traceM "trigger handler"
+      runUi' ctx {view, initial : update initial ev, update} topLayout newView) 
     newView
-    oldUi
+    (spy "oldUi in runUi'" oldUi)
     oldView
   setContent topLayout patched
   pure unit
@@ -73,6 +73,7 @@ diffHeight new old view = when (new.height /= old.height) $ maybeDo (setHeight v
 
 diffUi :: ∀e. Context -> EventHandler e -> Ui e -> Ui e -> View -> Effect View
 diffUi ctx handler (Button new) (Button old) view = do
+  traceM "button"
   let btn = unsafeCoerce view :: I.Button
   diffSetText new old btn
   diffSetTextStyle new old btn
@@ -80,6 +81,7 @@ diffUi ctx handler (Button new) (Button old) view = do
   pure view
 
 diffUi ctx handler (Checkbox new) (Checkbox old) view = do
+  traceM "checkbox"
   let checkbox = unsafeCoerce view :: I.Checkbox
   I.onChecked checkbox (\_ -> pure unit)
   when (new.checked /= old.checked) $
@@ -88,6 +90,7 @@ diffUi ctx handler (Checkbox new) (Checkbox old) view = do
   pure view
 
 diffUi ctx handler (TextView new) (TextView old) view = do
+  traceM "textView"
   let textView = unsafeCoerce view :: I.TextView
   diffSetText new old textView
   diffHeight new old textView
@@ -95,6 +98,7 @@ diffUi ctx handler (TextView new) (TextView old) view = do
   pure view
 
 diffUi ctx handler (EditText new) (EditText old) view = do
+  traceM "editText"
   let editText = unsafeCoerce view :: I.EditText
   -- make sure we remove the listener, to ensure setting the text does not trigger the listener
   I.removeOnTextChange editText
@@ -115,7 +119,7 @@ diffUi ctx handler (LinearLayout {orientation} children) (LinearLayout {orientat
   -- diff items, that already existed
   _ <- sequence $ zipWith (\(index /\ a) a' -> do
         oldItem <- getView linearLayout index
-        patched <- diffUi ctx handler a a' oldItem
+        patched <- diffUi ctx handler (spy "a" a) a' (spy "oldItem" oldItem)
         replaceView linearLayout index patched
         pure unit
     ) (indexed children) children'
@@ -132,6 +136,13 @@ diffUi ctx handler (LinearLayout {orientation} children) (LinearLayout {orientat
     for_ removeIndices $ \(index /\ child) -> do
       linearLayout `removeView` index
     pure view
+
+diffUi ctx handler (RecyclerView children) (RecyclerView old) view = do
+  traceM "recyclerView"
+  let rv = unsafeCoerce view :: I.RecyclerView (Ui e)
+  I.updateRecyclerViewFrom rv old children
+  pure view
+
 diffUi ctx handler new _ view = do
   traceM "renderNew"
   renderUi ctx handler new
@@ -167,25 +178,20 @@ renderUi ctx handler (Checkbox {checked, onChecked}) = do
   maybeDo (setChecked view) checked
 
   pure $ toView view
-renderUi ctx handler (TextView {text, textSize, height, width}) = do
+renderUi ctx handler (TextView {text, textSize, height, width, textStyle}) = do
   tv <- I.textView ctx ""
   maybeDo (setText tv) text
   maybeDo (setTextSize tv) textSize
   maybeDo (setWidth tv) width
   maybeDo (setHeight tv) width
+  maybeDo (setTextStyle tv) textStyle
   pure $ toView tv
 
+renderUi ctx handler (RecyclerView ls) = do
+  let defaultUi = fromMaybe Empty $ head ls
+  let createView ctx' = (renderUi ctx' handler defaultUi) /\ defaultUi
+  let bindView view index new old = void $ diffUi ctx handler new old view
+  rv <- I.recyclerView ctx ls (ls <#> const defaultUi) createView bindView
+  pure $ toView rv
+
 renderUi ctx handler (Empty) = emptyView ctx
-
-
-class Diff a diff | a -> diff where
-  diff :: a -> a -> diff
-
-data ItemDiff a = Add a | Remove a | Replace a a
-
-instance diffArray :: Diff (Array a) (Array (ItemDiff a)) where
-  diff a b 
-    | length a == length b = zipWith go a b
-      where
-        go a b = Replace a b
-    | otherwise = unsafeCoerce unit

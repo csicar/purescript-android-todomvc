@@ -12,6 +12,7 @@ import Data.Array as F
 import Data.Maybe (Maybe(..))
 import Data.Tuple (fst, snd)
 import Data.Tuple.Nested (type (/\), (/\))
+import Debug.Trace (spy)
 import Effect (Effect)
 import Effect.Class.Console (log)
 
@@ -44,9 +45,12 @@ type Todo =
 
 initialModel ∷ Model
 initialModel =
-  { todos: [{text: "Buy Milk", completed: false, editing: false, id: 1}]
+  { todos: 
+    [ {text: "Buy Milk", completed: false, editing: false, id: 1}
+    , {text: "else stuff", completed: true, editing: false, id: 2}
+    ]
   , pending: ""
-  , fresh: 2
+  , fresh: 3
   , visibility: All
   }
 
@@ -119,7 +123,6 @@ view {todos, pending, visibility} =
         , onSubmit AddTodo
         ]
       ]
-    -- , recyclerView todos (\todo -> button [text title])
     , (viewTodos visibility todos) 
     , viewControls visibility todos
     ]
@@ -138,7 +141,10 @@ viewTodos visibility todos =
     allCompleted =
       F.all _.completed todos
   in
-    linearLayout [orientation Vertical] (filteredTodos <#> viewTodo)
+    linearLayout 
+      [orientation Vertical]
+      (filteredTodos <#> viewTodo)
+    -- recyclerView $ filteredTodos <#> viewTodo
 
 viewTodo :: Todo -> Ui Action
 viewTodo todo =
@@ -154,8 +160,6 @@ viewTodo todo =
         ] 
       else textView 
         [ text todo.text
-        , width MatchParent
-        , height MatchParent
         ]
     , button [ text "⨯", onClick (DeleteTodo todo.id) ]
     , button [ text "✎", onClick (EditingTodo todo.id true)]

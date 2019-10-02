@@ -46,6 +46,7 @@ data Ui e
   | EditText (EditTextAttr e)
   | Checkbox (CheckboxAttr e)
   | TextView (TextViewAttr e)
+  | RecyclerView (Array (Ui e))
   | Empty
 
 button :: ∀e. Array (ButtonAttr e -> ButtonAttr e) -> Ui e
@@ -62,3 +63,6 @@ checkbox = foldr ($) {checked : Nothing, onChecked: Nothing} >>> Checkbox
 
 textView :: ∀e. Array (TextViewAttr e -> TextViewAttr e) -> Ui e
 textView = foldr ($) {text: Nothing, textSize: Nothing, textStyle: Nothing, height: Nothing, width: Nothing} >>> TextView
+
+recyclerView :: ∀e. (Array (Ui e))-> Ui e
+recyclerView ls = RecyclerView ls

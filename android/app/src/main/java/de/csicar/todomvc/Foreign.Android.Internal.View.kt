@@ -1,8 +1,8 @@
 package Foreign.Android.Internal.View
 
 
+import Foreign.PsRuntime.appRun
 import PS.Data.Tuple.Module
-import android.app.ActionBar
 import android.app.Activity
 import android.content.Context
 import android.graphics.Typeface
@@ -13,7 +13,6 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.WindowDecorActionBar
 import androidx.core.text.HtmlCompat
 import androidx.core.view.*
 import androidx.core.widget.addTextChangedListener
@@ -36,7 +35,10 @@ val __linearLayout = { ctx: Any ->
     ctx as Context
 
     LinearLayout(ctx).also {
-        val l = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        val l = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
         it.layoutParams = l
     }
 }
@@ -60,7 +62,10 @@ val __emptyView = { ctx: Any ->
 val __button = { ctx: Any, str: Any ->
     ctx as Context; str as String
     val btn = Button(ctx)
-    btn.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+    btn.layoutParams = ViewGroup.LayoutParams(
+        ViewGroup.LayoutParams.WRAP_CONTENT,
+        ViewGroup.LayoutParams.WRAP_CONTENT
+    )
     btn.text = str
     btn
 }
@@ -75,7 +80,10 @@ val __textView = { ctx: Any, str: Any ->
 val __setWidth = { view: Any, layout: Any ->
     view as View; layout as PS.Android.Attributes.Module._Type_Layout
     if (view.layoutParams == null) {
-        view.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        view.layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
     }
     view.layoutParams.width = when (layout) {
         PS.Android.Attributes.Module._Type_Layout.MatchParent -> ViewGroup.LayoutParams.MATCH_PARENT
@@ -86,7 +94,10 @@ val __setWidth = { view: Any, layout: Any ->
 val __setHeight = { view: Any, layout: Any ->
     view as View; layout as PS.Android.Attributes.Module._Type_Layout
     if (view.layoutParams == null) {
-        view.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        view.layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
     }
     view.layoutParams.height = when (layout) {
         PS.Android.Attributes.Module._Type_Layout.MatchParent -> ViewGroup.LayoutParams.MATCH_PARENT
@@ -109,7 +120,10 @@ class EditTextListener(val ctx: Context) : EditText(ctx) {
 val __editText = { ctx: Any ->
     ctx as Context
     val et = EditTextListener(ctx)
-    et.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+    et.layoutParams = ViewGroup.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT,
+        ViewGroup.LayoutParams.WRAP_CONTENT
+    )
     et
 }
 
@@ -123,7 +137,7 @@ val __setEditType = { view: Any, ty: Any ->
     }
 }
 
-val __setSingleLine = {view: Any, singleLine: Any ->
+val __setSingleLine = { view: Any, singleLine: Any ->
     view as EditText; singleLine as Boolean
     view.isSingleLine = singleLine
 }
@@ -162,7 +176,10 @@ val __imageView = { ctx: Any, res: Any ->
 val __checkbox = { ctx: Any ->
     ctx as Context;
     CheckBox(ctx).also {
-        it.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        it.layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
     }
 }
 
@@ -171,9 +188,10 @@ val __setChecked = { checkbox: Any, checked: Any ->
     checkbox.isChecked = checked
 }
 
-val __onChecked = {checkbox: Any, cb: Any ->
+val __onChecked = { checkbox: Any, cb: Any ->
     checkbox as CheckBox; cb as (Boolean) -> (() -> Any)
     checkbox.setOnCheckedChangeListener { _, isChecked ->
+        println("asd")
         cb(isChecked)()
     }
 }
@@ -202,7 +220,7 @@ val __replaceView = { viewGroup: Any, index: Any, view: Any ->
     }
 }
 
-val __removeView = {viewGroup: Any, index: Any ->
+val __removeView = { viewGroup: Any, index: Any ->
     viewGroup as ViewGroup; index as Int;
     println("remove index $index, ${viewGroup.childCount}")
     viewGroup.getChildAt(index).clearFocus();
@@ -249,7 +267,7 @@ val __setTextSize = { textView: Any, size: Any ->
     Unit
 }
 
-val __setTextStyle = {textView: Any, style: Any ->
+val __setTextStyle = { textView: Any, style: Any ->
     textView as TextView; style as PS.Android.Attributes.Module._Type_TextStyle
     textView.typeface = when (style) {
         PS.Android.Attributes.Module._Type_TextStyle.Bold -> Typeface.DEFAULT_BOLD
@@ -258,48 +276,71 @@ val __setTextStyle = {textView: Any, style: Any ->
     }
 }
 
+typealias ViewBinder = ((View) -> ((Int) -> ((Any) -> ((Any) -> (() -> View)))))
+
 class PsRecyclerViewAdapter(
-    var myDataset: List<Any>,
-    private val createViewHolder: (Context) -> (() -> Any)
+    var dataset: List<Any>,
+    var oldDataset: List<Any>,
+    private val createViewHolder: (Context) -> (() -> Any),
+    private val bindView: ViewBinder
 ) :
     RecyclerView.Adapter<PsRecyclerViewAdapter.PsBinderViewHolder>() {
 
-    class PsBinderViewHolder(val view: View, val binder: ((Int) -> ((Any) -> (() -> Unit)))) :
+    class PsBinderViewHolder(val view: View, var uiModel: Any) :
         RecyclerView.ViewHolder(view)
 
 
-    override fun onCreateViewHolder(
-        parent: ViewGroup,
-        viewType: Int
-    ): PsRecyclerViewAdapter.PsBinderViewHolder {
-        val (vh, binder) = createViewHolder(parent.context)() as Module._Type_Tuple.Tuple
-        return PsBinderViewHolder(vh as View, binder as ((Int) -> ((Any) -> (() -> Unit))))
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PsBinderViewHolder {
+        val res = createViewHolder(parent.context) as Module._Type_Tuple.Tuple
+        println("create view (model: ${res.value1}")
+        return PsBinderViewHolder(res.value0.appRun() as View, res.value1)
     }
 
     override fun onBindViewHolder(holder: PsBinderViewHolder, position: Int) {
-        holder.binder(position)(myDataset[position])()
+        println("bind view! (position $position model ${holder.uiModel})")
+        val oldModel = holder.uiModel
+        holder.uiModel = dataset[position]
+        bindView(holder.view)(position)(holder.uiModel)(oldModel)()
     }
 
-    override fun getItemCount() = myDataset.size
+    override fun getItemCount() = dataset.size
 }
 
+val __recyclerView =
+    { ctx: Any, dataset: Any, oldDataset: Any, createViewHolder: Any, bindView: Any ->
+        ctx as Context
+        createViewHolder as ((Context) -> (() -> Any))
+        dataset as List<Any>
+        oldDataset as List<Any>
+        bindView as ViewBinder
 
-val __recyclerView = { ctx: Any, dataset: Any, createViewHolder: Any ->
-    ctx as Context; createViewHolder as ((Context) -> (() -> Any)); dataset as List<Any>
 
-
-
-    RecyclerView(ctx).apply {
-        layoutManager = LinearLayoutManager(ctx)
-        adapter = PsRecyclerViewAdapter(dataset, createViewHolder)
+        RecyclerView(ctx).apply {
+            layoutManager = LinearLayoutManager(ctx)
+            adapter = PsRecyclerViewAdapter(dataset, oldDataset, createViewHolder, bindView)
+        }
     }
-}
 
 val __updateRecyclerView = { view: Any, newVal: Any ->
     view as RecyclerView; newVal as List<Any>
     val adapter = view.adapter as PsRecyclerViewAdapter
-    adapter.myDataset = newVal
-    adapter.notifyDataSetChanged()
+    adapter.dataset = newVal
+    if (!view.isComputingLayout) {
+
+        adapter.notifyDataSetChanged()
+    }
+}
+
+val __updateRecyclerViewFrom = { view: Any, newVal: Any, oldVal: Any ->
+    view as RecyclerView; newVal as List<Any>; oldVal as List<Any>
+    val adapter = view.adapter as PsRecyclerViewAdapter
+    adapter.dataset = newVal
+    adapter.oldDataset = oldVal
+    println("updateRecyclerViewFrom ${newVal.size}")
+    if (!view.isComputingLayout) {
+        adapter.notifyDataSetChanged()
+        println("update done")
+    }
 }
 
 val __setMargins = { view: Any, left: Any, top: Any, right: Any, bottom: Any ->
