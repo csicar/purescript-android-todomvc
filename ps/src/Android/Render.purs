@@ -48,10 +48,10 @@ runUi' ctx {view, initial, update} topLayout oldUi = do
     ctx
     -- TODO: this probably a memory leak, as it clojures over oldUi
     (\ev -> do
-      traceM "trigger handler"
-      runUi' ctx {view, initial : update initial ev, update} topLayout newView) 
+      runUi' ctx {view, initial : update initial ev, update} topLayout newView
+    ) 
     newView
-    (spy "oldUi in runUi'" oldUi)
+    oldUi
     oldView
   setContent topLayout patched
   pure unit
@@ -119,7 +119,7 @@ diffUi ctx handler (LinearLayout {orientation} children) (LinearLayout {orientat
   -- diff items, that already existed
   _ <- sequence $ zipWith (\(index /\ a) a' -> do
         oldItem <- getView linearLayout index
-        patched <- diffUi ctx handler (spy "a" a) a' (spy "oldItem" oldItem)
+        patched <- diffUi ctx handler a a' oldItem
         replaceView linearLayout index patched
         pure unit
     ) (indexed children) children'
@@ -140,7 +140,9 @@ diffUi ctx handler (LinearLayout {orientation} children) (LinearLayout {orientat
 diffUi ctx handler (RecyclerView children) (RecyclerView old) view = do
   traceM "recyclerView"
   let rv = unsafeCoerce view :: I.RecyclerView (Ui e)
-  I.updateRecyclerViewFrom rv old children
+  I.updateRecyclerView rv children
+  let bindView view index new old = diffUi ctx handler new old view
+  I.updateRecyclerViewBinder rv bindView
   pure view
 
 diffUi ctx handler new _ view = do
@@ -190,7 +192,7 @@ renderUi ctx handler (TextView {text, textSize, height, width, textStyle}) = do
 renderUi ctx handler (RecyclerView ls) = do
   let defaultUi = fromMaybe Empty $ head ls
   let createView ctx' = (renderUi ctx' handler defaultUi) /\ defaultUi
-  let bindView view index new old = void $ diffUi ctx handler new old view
+  let bindView view index new old = diffUi ctx handler new old view
   rv <- I.recyclerView ctx ls (ls <#> const defaultUi) createView bindView
   pure $ toView rv
 

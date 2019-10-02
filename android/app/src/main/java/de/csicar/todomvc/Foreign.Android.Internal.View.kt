@@ -6,6 +6,7 @@ import PS.Data.Tuple.Module
 import android.app.Activity
 import android.content.Context
 import android.graphics.Typeface
+import android.graphics.drawable.DrawableContainer
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
@@ -16,6 +17,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.text.HtmlCompat
 import androidx.core.view.*
 import androidx.core.widget.addTextChangedListener
+import androidx.recyclerview.widget.DefaultItemAnimator
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import PS.Android.Attributes.Module as Attributes
@@ -191,7 +193,6 @@ val __setChecked = { checkbox: Any, checked: Any ->
 val __onChecked = { checkbox: Any, cb: Any ->
     checkbox as CheckBox; cb as (Boolean) -> (() -> Any)
     checkbox.setOnCheckedChangeListener { _, isChecked ->
-        println("asd")
         cb(isChecked)()
     }
 }
@@ -280,27 +281,33 @@ typealias ViewBinder = ((View) -> ((Int) -> ((Any) -> ((Any) -> (() -> View)))))
 
 class PsRecyclerViewAdapter(
     var dataset: List<Any>,
-    var oldDataset: List<Any>,
     private val createViewHolder: (Context) -> (() -> Any),
-    private val bindView: ViewBinder
+    var bindView: ViewBinder
 ) :
     RecyclerView.Adapter<PsRecyclerViewAdapter.PsBinderViewHolder>() {
 
-    class PsBinderViewHolder(val view: View, var uiModel: Any) :
+    class PsBinderViewHolder(val view: LinearLayout, var uiModel: Any) :
         RecyclerView.ViewHolder(view)
 
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PsBinderViewHolder {
         val res = createViewHolder(parent.context) as Module._Type_Tuple.Tuple
-        println("create view (model: ${res.value1}")
-        return PsBinderViewHolder(res.value0.appRun() as View, res.value1)
+        val container = LinearLayout(parent.context)
+        container.addView(res.value0.appRun() as View)
+        return PsBinderViewHolder(container, res.value1)
     }
 
     override fun onBindViewHolder(holder: PsBinderViewHolder, position: Int) {
-        println("bind view! (position $position model ${holder.uiModel})")
         val oldModel = holder.uiModel
         holder.uiModel = dataset[position]
-        bindView(holder.view)(position)(holder.uiModel)(oldModel)()
+        val ret = bindView(holder.view.getChildAt(0))(position)(holder.uiModel)(oldModel)()
+        if (ret !== holder.view.getChildAt(0)) {
+            holder.view.removeViewAt(0)
+            holder.view.addView(ret)
+            println("set new")
+        } else {
+            println("already set")
+        }
     }
 
     override fun getItemCount() = dataset.size
@@ -317,7 +324,8 @@ val __recyclerView =
 
         RecyclerView(ctx).apply {
             layoutManager = LinearLayoutManager(ctx)
-            adapter = PsRecyclerViewAdapter(dataset, oldDataset, createViewHolder, bindView)
+            adapter = PsRecyclerViewAdapter(dataset, createViewHolder, bindView)
+            itemAnimator = DefaultItemAnimator()
         }
     }
 
@@ -325,22 +333,14 @@ val __updateRecyclerView = { view: Any, newVal: Any ->
     view as RecyclerView; newVal as List<Any>
     val adapter = view.adapter as PsRecyclerViewAdapter
     adapter.dataset = newVal
-    if (!view.isComputingLayout) {
-
-        adapter.notifyDataSetChanged()
-    }
+    adapter.notifyDataSetChanged()
 }
 
-val __updateRecyclerViewFrom = { view: Any, newVal: Any, oldVal: Any ->
-    view as RecyclerView; newVal as List<Any>; oldVal as List<Any>
+val __updateRecyclerViewBinder = {view: Any, newBinder: Any ->
+    view as RecyclerView; newBinder as ViewBinder
     val adapter = view.adapter as PsRecyclerViewAdapter
-    adapter.dataset = newVal
-    adapter.oldDataset = oldVal
-    println("updateRecyclerViewFrom ${newVal.size}")
-    if (!view.isComputingLayout) {
-        adapter.notifyDataSetChanged()
-        println("update done")
-    }
+    adapter.bindView = newBinder
+    Unit
 }
 
 val __setMargins = { view: Any, left: Any, top: Any, right: Any, bottom: Any ->

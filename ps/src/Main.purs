@@ -130,7 +130,7 @@ view {todos, pending, visibility} =
 viewTodos :: Visibility -> Array Todo -> Ui Action
 viewTodos visibility todos =
   let
-    filteredTodos = case visibility of
+    filteredTodos = spy "filteredTodos" $ case visibility of
       All →
         todos
       Active →
@@ -141,10 +141,10 @@ viewTodos visibility todos =
     allCompleted =
       F.all _.completed todos
   in
-    linearLayout 
-      [orientation Vertical]
-      (filteredTodos <#> viewTodo)
-    -- recyclerView $ filteredTodos <#> viewTodo
+    -- linearLayout 
+    --   [orientation Vertical]
+    --   (filteredTodos <#> viewTodo)
+    recyclerView $ filteredTodos <#> viewTodo
 
 viewTodo :: Todo -> Ui Action
 viewTodo todo =
