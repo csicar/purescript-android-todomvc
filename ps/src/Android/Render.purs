@@ -31,7 +31,7 @@ maybeDo f (Just v) = void $ f v
 
 type EventHandler e = e -> Effect Unit
 
-type SimpleApp state event = {view :: state -> Ui event, update :: state -> event -> state, initial:: state }
+type SimpleApp state event = {view :: state -> Ui event, update :: state -> event -> Effect state, initial:: state }
 
 runUi :: ∀s e.  Context -> SimpleApp s e -> Effect Unit
 runUi ctx app = do
@@ -48,7 +48,8 @@ runUi' ctx {view, initial, update} topLayout oldUi = do
     ctx
     -- TODO: this probably a memory leak, as it clojures over oldUi
     (\ev -> do
-      runUi' ctx {view, initial : update initial ev, update} topLayout newView
+      newState <- update initial ev
+      runUi' ctx {view, initial : newState, update} topLayout newView
     ) 
     newView
     oldUi

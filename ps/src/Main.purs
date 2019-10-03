@@ -6,15 +6,16 @@ import Prelude
 
 import Android.Internal.View (Context)
 import Android.Render (runUi)
+import Android.Sqlite (Db, columnAsInt, columnAsString, createDb, execSql, mapCursor, querySql)
 import Data.Array (drop, filter, length, range, zip)
 import Data.Array as Array
 import Data.Array as F
 import Data.Maybe (Maybe(..))
-import Data.Tuple (fst, snd)
+import Data.Tuple (Tuple(..), fst, snd)
 import Data.Tuple.Nested (type (/\), (/\))
 import Debug.Trace (spy)
 import Effect (Effect)
-import Effect.Class.Console (log)
+import Effect.Class.Console (log, logShow)
 
 type Model =
   { todos ∷ Array Todo
@@ -73,29 +74,31 @@ modifyWhere ∷ forall f a. Functor f ⇒ (a → Boolean) → (a → a) → f a 
 modifyWhere pred mod = map (\a → if pred a then mod a else a)
 
 
-update :: Model -> Action -> Model
-update model = case _ of
-  None -> model
-  UpdatePending pending -> model {pending = pending}
-  AddTodo -> 
-    if model.pending == "" 
-      then model
-      else model {pending = "", fresh = model.fresh + 1, todos = Array.snoc model.todos (newTodo model.pending model.fresh)}
-  UpdateTodo todo text -> model { todos = model.todos 
+update :: Db -> Model -> Action -> Effect Model
+update db model = case _ of
+  None -> pure model
+  UpdatePending pending -> pure $ model {pending = pending}
+  AddTodo -> if model.pending == "" 
+      then pure model
+      else do 
+        let new = newTodo model.pending model.fresh
+        _ <- execSql db "INSERT INTO todos (id, text, completed) VALUES (?, ?, ?)" [show new.id, new.text, show 1]
+        pure $ model {pending = "", fresh = model.fresh + 1, todos = Array.snoc model.todos new}
+  UpdateTodo todo text -> pure $ model { todos = model.todos 
     # modifyWhere (eq todo <<< _.id) 
     _ { text = text } }
   ToggleTodo todo checked ->
-    model { todos = model.todos 
+    pure $ model { todos = model.todos 
     # modifyWhere (eq todo <<< _.id)
     _ { completed = checked } }
-  EditingTodo todo editing -> model { todos = model.todos 
+  EditingTodo todo editing -> pure $ model { todos = model.todos 
     # modifyWhere (eq todo <<< _.id)
     _ { editing = editing }
     }
-  DeleteTodo todo -> model { todos = model.todos #  Array.filter (not eq todo <<< _.id) }
-  DeleteCompleted -> model { todos = model.todos # Array.filter (not _.completed)}
-  ToggleAll checked -> model { todos = model.todos <#> _ { completed = checked } }
-  ChangeVisibility visibility -> model { visibility  = visibility }
+  DeleteTodo todo -> pure $ model { todos = model.todos #  Array.filter (not eq todo <<< _.id) }
+  DeleteCompleted -> pure $ model { todos = model.todos # Array.filter (not _.completed)}
+  ToggleAll checked -> pure $ model { todos = model.todos <#> _ { completed = checked } }
+  ChangeVisibility visibility -> pure $ model { visibility  = visibility }
 
 -- update s Clicked = s { todos = s.todos <> [{title: s.textFieldText, done: false}], textFieldText = "" }
 -- update s (Change txt) = s {textFieldText = txt }
@@ -197,4 +200,14 @@ viewVisibility v vCurrent =
 
 main :: Context -> Effect Unit
 main ctx = do
-  runUi ctx {initial: initialModel, update, view}
+  db <- createDb ctx 1 "todos" "CREATE TABLE todos (id INTEGER, text TEXT, completed INTEGER)"
+  -- _ <- execSql db "INSERT INTO test (id, text) VALUES (1, \"asd\")"
+  -- _ <- execSql db "INSERT INTO test (id, text) VALUES (1, \"from db!!!\")"
+  cursor <- querySql db "SELECT * FROM todos" []
+  res <- mapCursor cursor $ \c -> do
+    id <- columnAsInt c "id"
+    text <- columnAsString c "text"
+    completed <- columnAsInt c "completed"
+    pure {completed: if completed == 0 then false else true, id, text, editing: false}
+  -- logShow res
+  runUi ctx {initial: initialModel {todos = res}, update: update db, view}
