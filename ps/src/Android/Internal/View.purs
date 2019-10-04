@@ -197,8 +197,8 @@ foreign import data RecyclerView :: Type -> Type
 
 instance isViewRecyclerView :: IsView (RecyclerView a) where toView = unsafeCoerce
 
-foreign import _recyclerView :: ∀a. EffectFn5 Context (Array a) (Array a) (Context -> Tuple (Effect View) a) (View -> Int -> a -> a -> Effect View) (RecyclerView a)
-recyclerView = runEffectFn5 _recyclerView
+foreign import _recyclerView :: ∀a. EffectFn4 Context (Array a) (Context -> Tuple (Effect View) a) (View -> Int -> a -> a -> Effect View) (RecyclerView a)
+recyclerView = runEffectFn4 _recyclerView
 
 foreign import _updateRecyclerView :: ∀a. EffectFn2 (RecyclerView a) (Array a) Unit
 updateRecyclerView :: ∀a. (RecyclerView a) -> (Array a) -> Effect Unit

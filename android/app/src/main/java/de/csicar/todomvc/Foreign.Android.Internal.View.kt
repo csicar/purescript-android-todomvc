@@ -314,11 +314,10 @@ class PsRecyclerViewAdapter(
 }
 
 val __recyclerView =
-    { ctx: Any, dataset: Any, oldDataset: Any, createViewHolder: Any, bindView: Any ->
+    { ctx: Any, dataset: Any, createViewHolder: Any, bindView: Any ->
         ctx as Context
         createViewHolder as ((Context) -> (() -> Any))
         dataset as List<Any>
-        oldDataset as List<Any>
         bindView as ViewBinder
 
 
@@ -333,10 +332,13 @@ val __updateRecyclerView = { view: Any, newVal: Any ->
     view as RecyclerView; newVal as List<Any>
     val adapter = view.adapter as PsRecyclerViewAdapter
     adapter.dataset = newVal
-    adapter.notifyDataSetChanged()
+    view.post(Runnable {
+        adapter.notifyDataSetChanged()
+
+    })
 }
 
-val __updateRecyclerViewBinder = {view: Any, newBinder: Any ->
+val __updateRecyclerViewBinder = { view: Any, newBinder: Any ->
     view as RecyclerView; newBinder as ViewBinder
     val adapter = view.adapter as PsRecyclerViewAdapter
     adapter.bindView = newBinder

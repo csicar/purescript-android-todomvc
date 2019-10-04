@@ -194,7 +194,7 @@ renderUi ctx handler (RecyclerView ls) = do
   let defaultUi = fromMaybe Empty $ head ls
   let createView ctx' = (renderUi ctx' handler defaultUi) /\ defaultUi
   let bindView view index new old = diffUi ctx handler new old view
-  rv <- I.recyclerView ctx ls (ls <#> const defaultUi) createView bindView
+  rv <- I.recyclerView ctx ls createView bindView
   pure $ toView rv
 
 renderUi ctx handler (Empty) = emptyView ctx
