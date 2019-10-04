@@ -40,6 +40,7 @@ Build & install the app:
 
 ```bash
 cd android
+git clone https://github.com/csicar/pskt-foreigns app/src/main/java/foreigns
 gradle installDebug
 ```
 
